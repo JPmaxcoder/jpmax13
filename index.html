@@ -1,0 +1,443 @@
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1F3864">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Station Entry">
+<link rel="manifest" href="manifest.webmanifest">
+<title>MOCOO Station Entry</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#222;background:#fff}
+header{background:#1F3864;color:#fff;padding:12px 14px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:18px}
+header small{opacity:.85}
+.screen{display:none;padding:12px 12px 90px}
+.screen.on{display:block}
+h2{font-size:16px;color:#1F3864;border-bottom:2px solid #1F3864;padding-bottom:3px;margin:16px 0 6px}
+label{display:block;font-size:13px;color:#595959;margin-top:9px}
+input,select,textarea{width:100%;padding:10px;font-size:16px;border:1px solid #aaa;border-radius:6px;background:#FFF2CC}
+input[readonly]{background:#EEE}
+textarea{min-height:56px}
+.row{display:flex;gap:8px}.row>div{flex:1}
+.btn{display:block;width:100%;padding:13px;margin-top:12px;border:0;border-radius:8px;color:#fff;font-size:16px;font-weight:bold}
+.green{background:#2E7D32}.navy{background:#1F3864}.orange{background:#C55A11}.grey{background:#7F7F7F}
+.mini{padding:4px 8px;border:0;border-radius:4px;background:#DDD;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#1F3864;color:#fff;padding:6px;text-align:left}
+td{border-bottom:1px solid #ddd;padding:6px}
+.right{text-align:right}
+.msg{display:none;padding:10px;border-radius:6px;margin-top:8px}
+.msg.ok{display:block;background:#E2EFDA;color:#1E5631}
+.msg.err{display:block;background:#FCE4D6;color:#843C0C}
+.box{background:#EEF3FA;border-radius:8px;padding:10px;margin-top:8px;font-size:14px}
+.small{font-size:12px;color:#595959}
+.pend{color:#C55A11;font-weight:bold}.sentt{color:#2E7D32;font-weight:bold}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid #ccc;z-index:5}
+nav button{flex:1;padding:12px 2px;border:0;background:#fff;font-size:12px;color:#595959}
+nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
+#lock{position:fixed;inset:0;background:#1F3864;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:20}
+#lock.on{display:flex}
+#lock input{width:220px;text-align:center;font-size:24px;letter-spacing:6px}
+.toast{display:none;position:fixed;top:64px;left:10px;right:10px;padding:12px;border-radius:8px;color:#fff;z-index:9}
+.toast.show{display:block}
+.toast.ok{background:#2E7D32}.toast.err{background:#C55A11}
+</style>
+</head>
+<body>
+<header><h1>MOCOO Station Entry</h1><small id="hdr"></small></header>
+<div id="toast" class="toast"></div>
+
+<div id="lock">
+  <h2 style="color:#fff;border-color:#fff">Enter station PIN</h2>
+  <input id="pinIn" type="password" inputmode="numeric" maxlength="6" onkeydown="if(event.key==='Enter')unlock()">
+  <button class="btn green" style="width:220px" onclick="unlock()">OPEN</button>
+  <div id="lockMsg" class="small" style="color:#FFF2CC;margin-top:10px"></div>
+</div>
+
+<section id="setup" class="screen" style="padding-bottom:20px">
+  <h2>First-time setup (head office)</h2>
+  <label>Repair station</label><select id="suStation"></select>
+  <label>Device number (01 to 99, different on each phone)</label><input id="suDevice" type="number" min="1" max="99" value="1">
+  <label>Set PIN (4 to 6 digits)</label><input id="suPin" type="password" inputmode="numeric" maxlength="6">
+  <label>Confirm PIN</label><input id="suPin2" type="password" inputmode="numeric" maxlength="6">
+  <button class="btn navy" onclick="doSetup()">SAVE SETUP</button>
+  <div id="suMsg" class="msg"></div>
+</section>
+
+<div id="app" style="display:none">
+
+<section id="s-new" class="screen on">
+  <h2>1. Sale details</h2>
+  <label>Transaction Date</label><input type="date" id="fDate" min="2025-01-01" max="2035-12-31">
+  <label>Repair Station</label><select id="fStation"></select>
+  <label>Bike Model</label><select id="fBike"></select>
+  <label>Warranty</label><select id="fWarranty"></select>
+  <label>Number Plate</label><input id="fPlate" placeholder="e.g. UGA 123A" autocapitalize="characters">
+  <label>Product Code (type, or pick from the list)</label><input id="fCode" list="codeList" autocapitalize="characters" autocomplete="off">
+  <datalist id="codeList"></datalist>
+  <label>Mileage (km)</label><input id="fMileage" type="number" inputmode="numeric" min="0">
+  <label>Quantity</label><select id="fQty" onchange="updateLookup()"></select>
+  <label>Remarks / Comments</label><input id="fRemarks">
+  <label>Spare Part Name</label><input id="fName" readonly>
+  <label>Unit Price (UGX)</label><input id="fPrice" readonly>
+  <label>Amount (UGX)</label><input id="fAmount" readonly>
+  <button class="btn green" onclick="addPart()">ADD PART / LABOUR</button>
+  <div id="addMsg" class="msg"></div>
+
+  <h2>2. Parts and labour on this job</h2>
+  <table>
+    <thead><tr><th>#</th><th>Code</th><th>Item</th><th>Qty</th><th class="right">Amount</th><th></th></tr></thead>
+    <tbody id="lineBody"></tbody>
+  </table>
+  <p class="right"><b>Lines: <span id="lineCount">0</span> &nbsp; Total UGX <span id="lineTotal">0</span></b></p>
+
+  <h2>3. Repair job details</h2>
+  <label>Repair category</label><select id="jCat" onchange="catChanged()"></select>
+  <label>Job description</label><input id="jDesc">
+  <label>Labour done</label><textarea id="jLabour"></textarea>
+  <label>Technician name</label><input id="jTech">
+  <div class="row">
+    <div><label>Start time</label><input type="time" id="jStart"></div>
+    <div><label>Finish time</label><input type="time" id="jFinish"></div>
+  </div>
+  <label>Job status</label><select id="jStatus"></select>
+  <label>Notes</label><textarea id="jNotes"></textarea>
+  <button class="btn navy" onclick="submitJob()">SUBMIT</button>
+  <div id="subMsg" class="msg"></div>
+</section>
+
+<section id="s-out" class="screen">
+  <h2>Outbox on this phone</h2>
+  <p>Pending: <b id="pendCount">0</b> &nbsp;&nbsp; Sent: <b id="sentCount">0</b></p>
+  <button class="btn orange" onclick="sendPending()">SEND ALL PENDING (one file)</button>
+  <p class="small">Each send creates one Excel-compatible (CSV) file. Share it by WhatsApp, email or Google Drive. Duplicates are skipped by head office, so sending twice is safe.</p>
+  <div id="outList"></div>
+</section>
+
+<section id="s-prices" class="screen">
+  <h2>Price list (view only)</h2>
+  <p class="small" id="pInfo"></p>
+  <input id="pSearch" placeholder="Search by code or name" oninput="renderPrices()">
+  <table style="margin-top:8px">
+    <thead><tr><th>Code</th><th>Item</th><th class="right">UGX</th></tr></thead>
+    <tbody id="pBody"></tbody>
+  </table>
+  <p class="small">Prices can only be changed by head office. If a price looks wrong, tell head office.</p>
+</section>
+
+<section id="s-set" class="screen">
+  <h2>This phone</h2>
+  <p id="setInfo"></p>
+  <button class="btn navy" onclick="lockNow()">LOCK NOW</button>
+  <h2>Clean-up</h2>
+  <p class="small">Removes SENT jobs from this phone only. Pending jobs and the job counter are kept.</p>
+  <button class="btn grey" onclick="clearSent()">CLEAR SENT HISTORY</button>
+</section>
+
+<nav>
+  <button class="on" onclick="go('s-new',this)">New Job</button>
+  <button onclick="go('s-out',this)">Outbox</button>
+  <button onclick="go('s-prices',this)">Prices</button>
+  <button onclick="go('s-set',this)">Settings</button>
+</nav>
+</div>
+
+<script src="prices.js"></script>
+<script>
+const STATIONS=[["Iganga","IGA"],["Jinja","JIN"],["Kamwokya","KAM"],["Kawempe","KAW"],["Luweero","LUW"],["Luzira","LUZ"],["Mukono","MUK"],["Namasuba","NAM"],["Nansana","NAN"],["Nateete","NAT"],["Old Kampala","OKA"]];
+const BIKES=["EV-S500","EV-S300"];
+const WARRANTY=["YES","NO"];
+const STATUS=["Completed","In progress","Waiting for parts","Not repaired"];
+const SALE_ONLY="Spare part sale only (counter sale)";
+const CATS=["Rear view mirror replacement","Chain adjustment","Chain replacement","Sprocket replacement","Tyre replacement (front or rear)","Brake pad / lining replacement","Brake cable / brake adjustment","Brake disc or brake assembly replacement","Shock absorber replacement","Handle / handlebar repair","Headlamp / indicator / light repair","Battery / wiring / electrical repair","Drive motor / controller repair","Seat / storage box / rack repair","Fender / side cover replacement","Stand / footrest repair","Wheel bearing / oil seal / inner tube","Instrument / dashboard repair","General service and inspection",SALE_ONLY,"Other (describe in job description)"];
+const FIELDS=["fDate","fStation","fBike","fWarranty","fPlate","fCode","fMileage","fQty","fRemarks","jCat","jDesc","jLabour","jTech","jStart","jFinish","jStatus","jNotes"];
+const HEAD=["Job ID","Line ID","Device ID","Submitted On","Repair Station","Transaction Date","Bike Model","Warranty","Number Plate","Mileage (km)","Technician","Repair Category","Job Description","Labour Done","Start Time","Finish Time","Job Status","Job Notes","Product Code","Spare Part Name","Unit Price (UGX)","Quantity","Amount (UGX)","Line Remarks"];
+const KEY_SET="mocoo_settings",KEY_JOBS="mocoo_jobs",KEY_DRAFT="mocoo_draft";
+
+const $=id=>document.getElementById(id);
+const pad=(n,w=2)=>String(n).padStart(w,"0");
+const fmt=n=>Number(n||0).toLocaleString("en-US");
+const htmlEsc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc=v=>{v=v==null?"":String(v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}};
+const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const stationCode=n=>(STATIONS.find(s=>s[0]===n)||["","XXX"])[1];
+const PRICES=new Map();
+let settings=null,jobs=[],lines=[],lastAutoDesc=SALE_ONLY,hiddenAt=0,toastTimer;
+
+function todayStr(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function stampNow(){const d=new Date();return todayStr()+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
+function stampFile(){const d=new Date();return todayStr().replace(/-/g,"")+"_"+pad(d.getHours())+pad(d.getMinutes())}
+function validDate(s){return /^\d{4}-\d{2}-\d{2}$/.test(s)&&+s.slice(0,4)>=2025&&+s.slice(0,4)<=2035}
+function show(id,text,ok){const el=$(id);el.textContent=text;el.className="msg "+(ok?"ok":"err")}
+function clearMsg(id){const el=$(id);el.textContent="";el.className="msg"}
+function toast(text,ok){const t=$("toast");t.textContent=text;t.className="toast show "+(ok?"ok":"err");clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.className="toast"},4000)}
+function fillSel(id,arr,val,placeholder){
+  let h=placeholder?'<option value="">-- choose --</option>':"";
+  h+=arr.map(v=>`<option value="${htmlEsc(v)}">${htmlEsc(v)}</option>`).join("");
+  $(id).innerHTML=h;
+  if(val!==undefined)$(id).value=val;
+}
+async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+
+function loadPrices(){
+  const PL=window.PRICE_LIST;
+  if(!PL)return false;
+  PL.items.forEach(([c,n,p])=>PRICES.set(String(c).toUpperCase(),{name:n,price:p}));
+  $("codeList").innerHTML=PL.items.map(([c,n])=>`<option value="${htmlEsc(c)}" label="${htmlEsc(n)}"></option>`).join("");
+  return true;
+}
+
+/* ---------- SETUP AND LOCK ---------- */
+async function doSetup(){
+  const st=$("suStation").value,dev=parseInt($("suDevice").value,10),pin=$("suPin").value.trim(),pin2=$("suPin2").value.trim();
+  if(!st)return show("suMsg","Choose the station.",false);
+  if(!(dev>=1&&dev<=99))return show("suMsg","Device number must be 1 to 99.",false);
+  if(!/^\d{4,6}$/.test(pin))return show("suMsg","PIN must be 4 to 6 digits.",false);
+  if(pin!==pin2)return show("suMsg","The PINs do not match.",false);
+  settings={station:st,device:dev,pinHash:await sha(pin),seq:0};
+  save(KEY_SET,settings);
+  boot();
+}
+function lockNow(){if(!settings)return;$("lock").classList.add("on");$("pinIn").value="";setTimeout(()=>$("pinIn").focus(),300)}
+async function unlock(){
+  const h=await sha($("pinIn").value.trim());
+  $("pinIn").value="";
+  if(h===settings.pinHash){$("lock").classList.remove("on");$("lockMsg").textContent=""}
+  else{$("lockMsg").textContent="Wrong PIN. Try again."}
+}
+
+/* ---------- FORM ---------- */
+function initForm(){
+  fillSel("fStation",STATIONS.map(s=>s[0]),settings.station);
+  fillSel("fBike",BIKES,"",true);
+  fillSel("fWarranty",WARRANTY,"",true);
+  fillSel("fQty",[1,2,3,4,5,6,7,8,9].map(String),"1");
+  fillSel("jCat",CATS,SALE_ONLY);
+  fillSel("jStatus",STATUS,"Completed");
+  if(!$("fDate").value)$("fDate").value=todayStr();
+  if(!$("jDesc").value){$("jDesc").value=SALE_ONLY;lastAutoDesc=SALE_ONLY}
+}
+function updateLookup(){
+  const code=$("fCode").value.trim().toUpperCase(),p=PRICES.get(code),q=parseInt($("fQty").value,10)||0;
+  $("fName").value=code?(p?p.name:"NOT IN PRICE LIST"):"";
+  $("fPrice").value=p?fmt(p.price):"";
+  $("fAmount").value=p?fmt(p.price*q):"";
+}
+function header(){
+  return{date:$("fDate").value,station:$("fStation").value,bike:$("fBike").value,warranty:$("fWarranty").value,plate:$("fPlate").value.trim().toUpperCase(),mileage:$("fMileage").value.trim()};
+}
+function headerError(h){
+  if(!validDate(h.date))return "Pick a transaction date between 2025 and 2035.";
+  if(!h.station)return "Choose the repair station.";
+  if(!h.bike)return "Choose the bike model.";
+  if(!h.warranty)return "Choose warranty YES or NO.";
+  if(h.plate.length<3)return "Enter the number plate (at least 3 characters).";
+  if(!/^\d+$/.test(h.mileage))return "Enter the mileage in whole kilometres.";
+  return "";
+}
+function addPart(){
+  clearMsg("addMsg");
+  const e=headerError(header());
+  if(e)return show("addMsg",e,false);
+  const code=$("fCode").value.trim().toUpperCase(),p=PRICES.get(code);
+  if(!code)return show("addMsg","Enter the product code.",false);
+  if(!p)return show("addMsg","Product code "+code+" is not in the price list. Check the code.",false);
+  const qty=parseInt($("fQty").value,10);
+  if(!(qty>=1&&qty<=9))return show("addMsg","Quantity must be 1 to 9.",false);
+  lines.push({code,name:p.name,price:p.price,qty,amount:p.price*qty,remarks:$("fRemarks").value.trim()});
+  $("fCode").value="";$("fQty").value="1";$("fRemarks").value="";
+  updateLookup();renderLines();draftSave();$("fCode").focus();
+}
+function renderLines(){
+  $("lineBody").innerHTML=lines.length
+    ?lines.map((l,i)=>`<tr><td>${i+1}</td><td>${htmlEsc(l.code)}</td><td>${htmlEsc(l.name)}</td><td>${l.qty}</td><td class="right">${fmt(l.amount)}</td><td><button class="mini" onclick="editLine(${i})">Edit</button> <button class="mini" onclick="delLine(${i})">X</button></td></tr>`).join("")
+    :'<tr><td colspan="6" class="small">No parts or labour added yet.</td></tr>';
+  $("lineCount").textContent=lines.length;
+  $("lineTotal").textContent=fmt(lines.reduce((s,l)=>s+l.amount,0));
+}
+function editLine(i){
+  const l=lines[i];
+  $("fCode").value=l.code;$("fQty").value=String(l.qty);$("fRemarks").value=l.remarks||"";
+  lines.splice(i,1);updateLookup();renderLines();draftSave();$("fCode").focus();
+}
+function delLine(i){
+  if(!confirm("Remove "+lines[i].name+" from this job?"))return;
+  lines.splice(i,1);renderLines();draftSave();
+}
+function catChanged(){
+  const d=$("jDesc"),c=$("jCat").value;
+  if(!d.value.trim()||d.value===lastAutoDesc){d.value=c;lastAutoDesc=c}
+  draftSave();
+}
+function jobFields(){
+  return{cat:$("jCat").value,desc:$("jDesc").value.trim(),labour:$("jLabour").value.trim(),tech:$("jTech").value.trim(),start:$("jStart").value,finish:$("jFinish").value,status:$("jStatus").value,notes:$("jNotes").value.trim()};
+}
+function draftSave(){const d={lines,lastAutoDesc};FIELDS.forEach(f=>d[f]=$(f).value);save(KEY_DRAFT,d)}
+function draftLoad(){
+  const d=load(KEY_DRAFT,null);
+  if(!d)return;
+  FIELDS.forEach(f=>{if(d[f]!==undefined)$(f).value=d[f]});
+  lines=Array.isArray(d.lines)?d.lines:[];
+  lastAutoDesc=d.lastAutoDesc||SALE_ONLY;
+}
+function resetAfterSubmit(){
+  lines=[];
+  $("fPlate").value="";$("fMileage").value="";$("fCode").value="";$("fQty").value="1";$("fRemarks").value="";
+  $("jCat").value=SALE_ONLY;$("jDesc").value=SALE_ONLY;lastAutoDesc=SALE_ONLY;
+  $("jLabour").value="";$("jStart").value="";$("jFinish").value="";$("jStatus").value="Completed";$("jNotes").value="";
+  updateLookup();renderLines();draftSave();
+}
+
+/* ---------- SUBMIT, FILE AND SHARE ---------- */
+function nextJobId(st){
+  settings.seq=(settings.seq||0)+1;
+  save(KEY_SET,settings);
+  return stationCode(st)+"-"+pad(settings.device)+"-J"+pad(settings.seq,6);
+}
+function submitJob(){
+  clearMsg("subMsg");
+  const h=header(),e=headerError(h);
+  if(e)return show("subMsg",e,false);
+  const j=jobFields();
+  if(!j.tech)return show("subMsg","Enter the technician name.",false);
+  if(!j.cat)return show("subMsg","Choose the repair category.",false);
+  if($("fCode").value.trim())return show("subMsg","A product code is typed but not added yet. Press ADD PART / LABOUR, or clear the product code.",false);
+  if(j.start&&j.finish&&j.finish<j.start)return show("subMsg","Finish time is earlier than start time.",false);
+  if(!lines.length&&j.cat===SALE_ONLY)return show("subMsg","Add at least one spare part or labour line for a counter sale.",false);
+  const total=lines.reduce((s,l)=>s+l.amount,0);
+  if(!confirm("SUBMIT this job?\n\nStation: "+h.station+"\nPlate: "+h.plate+"\nLines: "+lines.length+"\nTotal: UGX "+fmt(total)+"\n\nOK = save on this phone and create the file to send."))return;
+
+  const jobId=nextJobId(h.station);
+  lines.forEach((l,i)=>{l.id=jobId+"-L"+pad(i+1)});
+  const job={jobId,submitted:stampNow(),status:"PENDING",h,j,lines:lines.map(l=>({...l}))};
+  jobs.push(job);
+  save(KEY_JOBS,jobs);
+  resetAfterSubmit();
+  toast("Saved on this phone as "+jobId+".",true);
+  shareCsv(csvText([job]),jobId+".csv").then(res=>afterShare(res,[jobId]));
+}
+function csvText(list){
+  const dev=pad(settings.device),rows=[HEAD];
+  list.forEach(jb=>{
+    const h=jb.h,j=jb.j;
+    const base=lineId=>[jb.jobId,lineId,dev,jb.submitted,h.station,h.date,h.bike,h.warranty,h.plate,h.mileage,j.tech,j.cat,j.desc,j.labour,j.start,j.finish,j.status,j.notes];
+    if(!jb.lines.length)rows.push(base(jb.jobId+"-L00").concat(["","","","","",""]));
+    jb.lines.forEach(l=>rows.push(base(l.id).concat([l.code,l.name,l.price,l.qty,l.amount,l.remarks||""])));
+  });
+  return "\uFEFF"+rows.map(r=>r.map(esc).join(",")).join("\r\n");
+}
+async function shareCsv(text,name){
+  const file=new File([text],name,{type:"text/csv"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file],title:"Station file "+name,text:"Station entry file for the office"});
+      return "shared";
+    }catch(err){
+      if(err.name==="AbortError")return "cancelled";
+    }
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(file);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  return "downloaded";
+}
+function afterShare(res,ids){
+  if(res==="cancelled"){toast("Not sent. The job stays PENDING in Outbox.",false);return}
+  if(res==="downloaded"){toast("File downloaded. Share it from Files / Downloads, then mark it as sent in Outbox.",true);return}
+  if(confirm("Was the file sent to the office?\n\nOK = mark as SENT\nCancel = keep as PENDING")){
+    markSent(ids);toast("Marked as SENT.",true);
+  }else{
+    toast("Kept as PENDING. Send it again from Outbox.",false);
+  }
+}
+function markSent(ids){
+  jobs.forEach(j=>{if(ids.includes(j.jobId))j.status="SENT"});
+  save(KEY_JOBS,jobs);
+  renderOutbox();
+}
+function sendPending(){
+  const pend=jobs.filter(j=>j.status==="PENDING");
+  if(!pend.length)return toast("Nothing pending to send.",false);
+  const ids=pend.map(j=>j.jobId);
+  const name=stationCode(settings.station)+"-"+pad(settings.device)+"_PENDING_"+stampFile()+".csv";
+  shareCsv(csvText(pend),name).then(res=>afterShare(res,ids));
+}
+
+/* ---------- OUTBOX, PRICES, SETTINGS ---------- */
+function jobTotal(j){return j.lines.reduce((s,l)=>s+l.amount,0)}
+function renderOutbox(){
+  const pend=jobs.filter(j=>j.status==="PENDING").length;
+  $("pendCount").textContent=pend;
+  $("sentCount").textContent=jobs.length-pend;
+  $("outList").innerHTML=jobs.length?jobs.slice().reverse().map(j=>{
+    const del=j.status==="PENDING"?`<button class="mini" onclick="delJob('${j.jobId}')">Delete</button>`:"";
+    return `<div class="box"><b>${j.jobId}</b> &nbsp;<span class="${j.status==="PENDING"?"pend":"sentt"}">${j.status}</span><br>${htmlEsc(j.h.date)} · ${htmlEsc(j.h.plate)} · ${htmlEsc(j.j.cat)}<br>Lines: ${j.lines.length} · UGX ${fmt(jobTotal(j))} &nbsp;${del}</div>`;
+  }).join(""):'<p class="small">No jobs saved on this phone yet.</p>';
+}
+function delJob(id){
+  if(!confirm("Delete pending job "+id+" from this phone? This cannot be undone."))return;
+  jobs=jobs.filter(j=>j.jobId!==id);
+  save(KEY_JOBS,jobs);renderOutbox();
+}
+function renderPrices(){
+  const PL=window.PRICE_LIST||{version:"NOT LOADED",items:[]},q=$("pSearch").value.trim().toLowerCase();
+  $("pInfo").textContent=PL.version+" · "+PL.items.length+" rows";
+  const hits=PL.items.filter(([c,n])=>!q||String(c).toLowerCase().includes(q)||n.toLowerCase().includes(q)).slice(0,150);
+  $("pBody").innerHTML=hits.map(([c,n,p])=>`<tr><td>${htmlEsc(c)}</td><td>${htmlEsc(n)}</td><td class="right">${fmt(p)}</td></tr>`).join("");
+}
+function renderSettings(){
+  $("setInfo").innerHTML="Station: <b>"+htmlEsc(settings.station)+"</b><br>Device: <b>"+pad(settings.device)+"</b><br>Pending jobs: <b>"+jobs.filter(j=>j.status==="PENDING").length+"</b>";
+}
+function clearSent(){
+  const n=jobs.filter(j=>j.status==="SENT").length;
+  if(!n)return toast("No sent jobs to clear.",false);
+  if(!confirm("Remove "+n+" SENT job(s) from this phone? Pending jobs are kept."))return;
+  jobs=jobs.filter(j=>j.status==="PENDING");
+  save(KEY_JOBS,jobs);renderOutbox();renderSettings();
+  toast("Sent history cleared.",true);
+}
+function go(id,btn){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("on"));
+  $(id).classList.add("on");btn.classList.add("on");
+  if(id==="s-out")renderOutbox();
+  if(id==="s-prices")renderPrices();
+  if(id==="s-set")renderSettings();
+  window.scrollTo(0,0);
+}
+
+/* ---------- BOOT ---------- */
+function boot(){
+  settings=load(KEY_SET,null);
+  if(!settings){
+    fillSel("suStation",STATIONS.map(s=>s[0]),"",true);
+    $("setup").classList.add("on");
+    $("app").style.display="none";
+    $("lock").classList.remove("on");
+    return;
+  }
+  $("setup").classList.remove("on");
+  $("app").style.display="block";
+  $("hdr").textContent=settings.station+" · Device "+pad(settings.device);
+  jobs=load(KEY_JOBS,[]);
+  initForm();draftLoad();renderLines();updateLookup();renderOutbox();renderSettings();
+  if(!loadPrices())toast("Price list not loaded. Connect to the internet once, then reopen the app.",false);
+  lockNow();
+}
+document.addEventListener("input",draftSave);
+document.addEventListener("change",draftSave);
+$("fCode").addEventListener("input",updateLookup);
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden)hiddenAt=Date.now();
+  else if(settings&&Date.now()-hiddenAt>120000)lockNow();
+});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+boot();
+</script>
+</body>
+</html>
