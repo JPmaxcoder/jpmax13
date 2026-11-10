@@ -1,7 +1,3 @@
-javascript
-// MOCOO spare parts price list for the station app.
-// Format per row: ["Product Code", "Item Name", Unit Price in UGX]
-// INT-001 to INT-015 are internal references (MOCOO codes not yet issued).
 window.PRICE_LIST = {
   version: "MOCOO 7-page list 2026.09.9-V5",
   items: [
