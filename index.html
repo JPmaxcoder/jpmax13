@@ -1,4 +1,3 @@
-html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,7 +49,6 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 <body>
 <header><h1>MOCOO Station Entry</h1><small id="hdr"></small></header>
 <div id="toast" class="toast"></div>
-
 <div id="lock">
   <h2 style="color:#fff;border-color:#fff">Enter station PIN</h2>
   <input id="pinIn" type="password" inputmode="numeric" maxlength="6" onkeydown="if(event.key==='Enter')unlock()">
@@ -148,7 +146,7 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 
 <script src="prices.js"></script>
 <script>
-const STATIONS=[["Iganga","IGA"],["Jinja","JIN"],["Kamwokya","KAM"],["Kawempe","KAW"],["Luweero","LUW"],["Luzira","LUZ"],["Mukono","MUK"],["Namasuba","NAM"],["Nansana","NAN"],["Nateete","NAT"],["Old Kampala","OKA"]];
+const STATIONS=[["Iganga","IGA"],["Jinja","JIN"],["Kamwokya","KAM"],["Kawempe","KAW"],["Kisenyi","KIS"],["Luweero","LUW"],["Luzira","LUZ"],["Mukono","MUK"],["Namasuba","NAM"],["Nansana","NAN"],["Nateete","NAT"],["Old Kampala","OKA"]];
 const BIKES=["EV-S500","EV-S300"];
 const WARRANTY=["YES","NO"];
 const STATUS=["Completed","In progress","Waiting for parts","Not repaired"];
@@ -157,7 +155,6 @@ const CATS=["Rear view mirror replacement","Chain adjustment","Chain replacement
 const FIELDS=["fDate","fStation","fBike","fWarranty","fPlate","fCode","fMileage","fQty","fRemarks","jCat","jDesc","jLabour","jTech","jStart","jFinish","jStatus","jNotes"];
 const HEAD=["Job ID","Line ID","Device ID","Submitted On","Repair Station","Transaction Date","Bike Model","Warranty","Number Plate","Mileage (km)","Technician","Repair Category","Job Description","Labour Done","Start Time","Finish Time","Job Status","Job Notes","Product Code","Spare Part Name","Unit Price (UGX)","Quantity","Amount (UGX)","Line Remarks"];
 const KEY_SET="mocoo_settings",KEY_JOBS="mocoo_jobs",KEY_DRAFT="mocoo_draft";
-
 const $=id=>document.getElementById(id);
 const pad=(n,w=2)=>String(n).padStart(w,"0");
 const fmt=n=>Number(n||0).toLocaleString("en-US");
@@ -168,7 +165,6 @@ const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const stationCode=n=>(STATIONS.find(s=>s[0]===n)||["","XXX"])[1];
 const PRICES=new Map();
 let settings=null,jobs=[],lines=[],lastAutoDesc=SALE_ONLY,hiddenAt=0,toastTimer;
-
 function todayStr(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function stampNow(){const d=new Date();return todayStr()+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
 function stampFile(){const d=new Date();return todayStr().replace(/-/g,"")+"_"+pad(d.getHours())+pad(d.getMinutes())}
@@ -183,7 +179,6 @@ function fillSel(id,arr,val,placeholder){
   if(val!==undefined)$(id).value=val;
 }
 async function sha(t){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-
 function loadPrices(){
   const PL=window.PRICE_LIST;
   if(!PL)return false;
