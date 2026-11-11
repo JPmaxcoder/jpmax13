@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1F3864">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Station Entry">
+<meta name="apple-mobile-web-app-title" content="JP Station Entry">
 <link rel="manifest" href="manifest.webmanifest">
-<title>MOCOO Station Entry</title>
+<title>JP - The station Entry</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#222;background:#fff}
@@ -47,7 +47,7 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 </style>
 </head>
 <body>
-<header><h1>MOCOO Station Entry</h1><small id="hdr"></small></header>
+<header><h1>JP - The station Entry</h1><small id="hdr"></small></header>
 <div id="toast" class="toast"></div>
 <div id="lock">
   <h2 style="color:#fff;border-color:#fff">Enter station PIN</h2>
@@ -71,7 +71,7 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 <section id="s-new" class="screen on">
   <h2>1. Sale details</h2>
   <label>Transaction Date</label><input type="date" id="fDate" min="2025-01-01" max="2035-12-31">
-  <label>Repair Station</label><select id="fStation"></select>
+  <label>Repair Station (set at setup, cannot be changed)</label><input id="fStation" readonly>
   <label>Bike Model</label><select id="fBike"></select>
   <label>Warranty</label><select id="fWarranty"></select>
   <label>Number Plate</label><input id="fPlate" placeholder="e.g. UGA 123A" autocapitalize="characters">
@@ -83,7 +83,7 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
   <label>Spare Part Name</label><input id="fName" readonly>
   <label>Unit Price (UGX)</label><input id="fPrice" readonly>
   <label>Amount (UGX)</label><input id="fAmount" readonly>
-  <button class="btn green" onclick="addPart()">ADD PART / LABOUR</button>
+  <button class="btn green" onclick="addPart()">ADD PART</button>
   <div id="addMsg" class="msg"></div>
 
   <h2>2. Parts and labour on this job</h2>
@@ -94,16 +94,8 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
   <p class="right"><b>Lines: <span id="lineCount">0</span> &nbsp; Total UGX <span id="lineTotal">0</span></b></p>
 
   <h2>3. Repair job details</h2>
-  <label>Repair category</label><select id="jCat" onchange="catChanged()"></select>
-  <label>Job description</label><input id="jDesc">
-  <label>Labour done</label><textarea id="jLabour"></textarea>
-  <label>Technician name</label><input id="jTech">
-  <div class="row">
-    <div><label>Start time</label><input type="time" id="jStart"></div>
-    <div><label>Finish time</label><input type="time" id="jFinish"></div>
-  </div>
-  <label>Job status</label><select id="jStatus"></select>
-  <label>Notes</label><textarea id="jNotes"></textarea>
+  <label>Repair category</label><select id="jCat"></select>
+  <label>Technician name (optional)</label><input id="jTech">
   <button class="btn navy" onclick="submitJob()">SUBMIT</button>
   <div id="subMsg" class="msg"></div>
 </section>
@@ -149,10 +141,9 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 const STATIONS=[["Iganga","IGA"],["Jinja","JIN"],["Kamwokya","KAM"],["Kawempe","KAW"],["Kisenyi","KIS"],["Luweero","LUW"],["Luzira","LUZ"],["Mukono","MUK"],["Namasuba","NAM"],["Nansana","NAN"],["Nateete","NAT"],["Old Kampala","OKA"]];
 const BIKES=["EV-S500","EV-S300"];
 const WARRANTY=["YES","NO"];
-const STATUS=["Completed","In progress","Waiting for parts","Not repaired"];
 const SALE_ONLY="Spare part sale only (counter sale)";
-const CATS=["Rear view mirror replacement","Chain adjustment","Chain replacement","Sprocket replacement","Tyre replacement (front or rear)","Brake pad / lining replacement","Brake cable / brake adjustment","Brake disc or brake assembly replacement","Shock absorber replacement","Handle / handlebar repair","Headlamp / indicator / light repair","Battery / wiring / electrical repair","Drive motor / controller repair","Seat / storage box / rack repair","Fender / side cover replacement","Stand / footrest repair","Wheel bearing / oil seal / inner tube","Instrument / dashboard repair","General service and inspection",SALE_ONLY,"Other (describe in job description)"];
-const FIELDS=["fDate","fStation","fBike","fWarranty","fPlate","fCode","fMileage","fQty","fRemarks","jCat","jDesc","jLabour","jTech","jStart","jFinish","jStatus","jNotes"];
+const CATS=["Rear view mirror replacement","Chain adjustment","Chain replacement","Sprocket replacement","Tyre replacement (front or rear)","Tyre puncture repair","Brake pad / lining replacement","Brake cable / brake adjustment","Brake fluid top-up / bleeding","Brake disc or brake assembly replacement","Brake light / brake switch repair","Shock absorber replacement","Front fork / suspension repair","Handle / handlebar repair","Throttle / accelerator repair","Headlamp / indicator / light repair","Tail light / number plate light repair","Horn replacement","Battery replacement","Battery / wiring / electrical repair","Charger / charging port repair","Ignition switch / key lock repair","Wiring harness replacement","Speed sensor repair","Drive motor / controller repair","Seat / storage box / rack repair","Fender / side cover replacement","Stand / footrest repair","Frame / chassis repair","Wheel bearing / oil seal / inner tube","Wheel rim / wheel alignment","Bolts nuts and fittings replacement","Body panel / paint / decal repair","Crash guard / bumper repair","Instrument / dashboard repair","General service and inspection",SALE_ONLY,"Other (describe in job description)"];
+const FIELDS=["fDate","fBike","fWarranty","fPlate","fCode","fMileage","fQty","fRemarks","jCat","jTech"];
 const HEAD=["Job ID","Line ID","Device ID","Submitted On","Repair Station","Transaction Date","Bike Model","Warranty","Number Plate","Mileage (km)","Technician","Repair Category","Job Description","Labour Done","Start Time","Finish Time","Job Status","Job Notes","Product Code","Spare Part Name","Unit Price (UGX)","Quantity","Amount (UGX)","Line Remarks"];
 const KEY_SET="mocoo_settings",KEY_JOBS="mocoo_jobs",KEY_DRAFT="mocoo_draft";
 const $=id=>document.getElementById(id);
@@ -164,7 +155,7 @@ const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}c
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const stationCode=n=>(STATIONS.find(s=>s[0]===n)||["","XXX"])[1];
 const PRICES=new Map();
-let settings=null,jobs=[],lines=[],lastAutoDesc=SALE_ONLY,hiddenAt=0,toastTimer;
+let settings=null,jobs=[],lines=[],hiddenAt=0,toastTimer;
 function todayStr(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function stampNow(){const d=new Date();return todayStr()+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
 function stampFile(){const d=new Date();return todayStr().replace(/-/g,"")+"_"+pad(d.getHours())+pad(d.getMinutes())}
@@ -208,14 +199,12 @@ async function unlock(){
 
 /* ---------- FORM ---------- */
 function initForm(){
-  fillSel("fStation",STATIONS.map(s=>s[0]),settings.station);
+  $("fStation").value=settings.station;
   fillSel("fBike",BIKES,"",true);
   fillSel("fWarranty",WARRANTY,"",true);
   fillSel("fQty",[1,2,3,4,5,6,7,8,9].map(String),"1");
   fillSel("jCat",CATS,SALE_ONLY);
-  fillSel("jStatus",STATUS,"Completed");
   if(!$("fDate").value)$("fDate").value=todayStr();
-  if(!$("jDesc").value){$("jDesc").value=SALE_ONLY;lastAutoDesc=SALE_ONLY}
 }
 function updateLookup(){
   const code=$("fCode").value.trim().toUpperCase(),p=PRICES.get(code),q=parseInt($("fQty").value,10)||0;
@@ -228,7 +217,7 @@ function header(){
 }
 function headerError(h){
   if(!validDate(h.date))return "Pick a transaction date between 2025 and 2035.";
-  if(!h.station)return "Choose the repair station.";
+  if(!h.station)return "The station is not set. Reset the phone setup.";
   if(!h.bike)return "Choose the bike model.";
   if(!h.warranty)return "Choose warranty YES or NO.";
   if(h.plate.length<3)return "Enter the number plate (at least 3 characters).";
@@ -264,27 +253,21 @@ function delLine(i){
   if(!confirm("Remove "+lines[i].name+" from this job?"))return;
   lines.splice(i,1);renderLines();draftSave();
 }
-function catChanged(){
-  const d=$("jDesc"),c=$("jCat").value;
-  if(!d.value.trim()||d.value===lastAutoDesc){d.value=c;lastAutoDesc=c}
-  draftSave();
-}
 function jobFields(){
-  return{cat:$("jCat").value,desc:$("jDesc").value.trim(),labour:$("jLabour").value.trim(),tech:$("jTech").value.trim(),start:$("jStart").value,finish:$("jFinish").value,status:$("jStatus").value,notes:$("jNotes").value.trim()};
+  const cat=$("jCat").value;
+  return{cat,desc:cat,labour:"",tech:$("jTech").value.trim(),start:"",finish:"",status:"Completed",notes:""};
 }
-function draftSave(){const d={lines,lastAutoDesc};FIELDS.forEach(f=>d[f]=$(f).value);save(KEY_DRAFT,d)}
+function draftSave(){const d={lines};FIELDS.forEach(f=>d[f]=$(f).value);save(KEY_DRAFT,d)}
 function draftLoad(){
   const d=load(KEY_DRAFT,null);
   if(!d)return;
   FIELDS.forEach(f=>{if(d[f]!==undefined)$(f).value=d[f]});
   lines=Array.isArray(d.lines)?d.lines:[];
-  lastAutoDesc=d.lastAutoDesc||SALE_ONLY;
 }
 function resetAfterSubmit(){
   lines=[];
   $("fPlate").value="";$("fMileage").value="";$("fCode").value="";$("fQty").value="1";$("fRemarks").value="";
-  $("jCat").value=SALE_ONLY;$("jDesc").value=SALE_ONLY;lastAutoDesc=SALE_ONLY;
-  $("jLabour").value="";$("jStart").value="";$("jFinish").value="";$("jStatus").value="Completed";$("jNotes").value="";
+  $("jCat").value=SALE_ONLY;
   updateLookup();renderLines();draftSave();
 }
 
@@ -299,10 +282,8 @@ function submitJob(){
   const h=header(),e=headerError(h);
   if(e)return show("subMsg",e,false);
   const j=jobFields();
-  if(!j.tech)return show("subMsg","Enter the technician name.",false);
   if(!j.cat)return show("subMsg","Choose the repair category.",false);
-  if($("fCode").value.trim())return show("subMsg","A product code is typed but not added yet. Press ADD PART / LABOUR, or clear the product code.",false);
-  if(j.start&&j.finish&&j.finish<j.start)return show("subMsg","Finish time is earlier than start time.",false);
+  if($("fCode").value.trim())return show("subMsg","A product code is typed but not added yet. Press ADD PART, or clear the product code.",false);
   if(!lines.length&&j.cat===SALE_ONLY)return show("subMsg","Add at least one spare part or labour line for a counter sale.",false);
   const total=lines.reduce((s,l)=>s+l.amount,0);
   if(!confirm("SUBMIT this job?\n\nStation: "+h.station+"\nPlate: "+h.plate+"\nLines: "+lines.length+"\nTotal: UGX "+fmt(total)+"\n\nOK = save on this phone and create the file to send."))return;
