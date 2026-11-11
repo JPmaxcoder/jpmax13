@@ -349,4 +349,70 @@ function renderOutbox(){
   const pend=jobs.filter(j=>j.status==="PENDING").length;
   $("pendCount").textContent=pend;
   $("sentCount").textContent=jobs.length-pend;
-  
+  $("outList").innerHTML=jobs.length?jobs.slice().reverse().map(j=>{
+    const del=j.status==="PENDING"?`<button class="mini" onclick="delJob('${j.jobId}')">Delete</button>`:"";
+    return `<div class="box"><b>${j.jobId}</b> &nbsp;<span class="${j.status==="PENDING"?"pend":"sentt"}">${j.status}</span><br>${htmlEsc(j.h.date)} · ${htmlEsc(j.h.plate)} · ${htmlEsc(j.j.cat)}<br>Lines: ${j.lines.length} · UGX ${fmt(jobTotal(j))} &nbsp;${del}</div>`;
+  }).join(""):'<p class="small">No jobs saved on this phone yet.</p>';
+}
+function delJob(id){
+  if(!confirm("Delete pending job "+id+" from this phone? This cannot be undone."))return;
+  jobs=jobs.filter(j=>j.jobId!==id);
+  save(KEY_JOBS,jobs);renderOutbox();
+}
+function renderPrices(){
+  const PL=window.PRICE_LIST||{version:"NOT LOADED",items:[]},q=$("pSearch").value.trim().toLowerCase();
+  $("pInfo").textContent=PL.version+" · "+PL.items.length+" rows";
+  const hits=PL.items.filter(([c,n])=>!q||String(c).toLowerCase().includes(q)||n.toLowerCase().includes(q)).slice(0,150);
+  $("pBody").innerHTML=hits.map(([c,n,p])=>`<tr><td>${htmlEsc(c)}</td><td>${htmlEsc(n)}</td><td class="right">${fmt(p)}</td></tr>`).join("");
+}
+function renderSettings(){
+  $("setInfo").innerHTML="Station: <b>"+htmlEsc(settings.station)+"</b><br>Device: <b>"+pad(settings.device)+"</b><br>Pending jobs: <b>"+jobs.filter(j=>j.status==="PENDING").length+"</b>";
+}
+function clearSent(){
+  const n=jobs.filter(j=>j.status==="SENT").length;
+  if(!n)return toast("No sent jobs to clear.",false);
+  if(!confirm("Remove "+n+" SENT job(s) from this phone? Pending jobs are kept."))return;
+  jobs=jobs.filter(j=>j.status==="PENDING");
+  save(KEY_JOBS,jobs);renderOutbox();renderSettings();
+  toast("Sent history cleared.",true);
+}
+function go(id,btn){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("on"));
+  $(id).classList.add("on");btn.classList.add("on");
+  if(id==="s-out")renderOutbox();
+  if(id==="s-prices")renderPrices();
+  if(id==="s-set")renderSettings();
+  window.scrollTo(0,0);
+}
+
+/* ---------- BOOT ---------- */
+function boot(){
+  settings=load(KEY_SET,null);
+  if(!settings){
+    fillSel("suStation",STATIONS.map(s=>s[0]),"",true);
+    $("setup").classList.add("on");
+    $("app").style.display="none";
+    $("lock").classList.remove("on");
+    return;
+  }
+  $("setup").classList.remove("on");
+  $("app").style.display="block";
+  $("hdr").textContent=settings.station+" · Device "+pad(settings.device);
+  jobs=load(KEY_JOBS,[]);
+  initForm();draftLoad();renderLines();updateLookup();renderOutbox();renderSettings();
+  if(!loadPrices())toast("Price list not loaded. Connect to the internet once, then reopen the app.",false);
+  lockNow();
+}
+document.addEventListener("input",draftSave);
+document.addEventListener("change",draftSave);
+$("fCode").addEventListener("input",updateLookup);
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden)hiddenAt=Date.now();
+  else if(settings&&Date.now()-hiddenAt>120000)lockNow();
+});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+boot();
+</script>
+</body>
+</html>
