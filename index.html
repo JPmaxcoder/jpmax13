@@ -315,6 +315,7 @@ function csvText(list){
   return "\uFEFF"+[HEAD,...list.flatMap(jobRows)].map(r=>r.map(esc).join(",")).join("\r\n");
 }
 function setUpStatus(t){
+  lastUpNote=t;
   const a=$("upStatus"),b=$("setUp");
   if(a)a.textContent=t;
   if(b)b.textContent=t;
