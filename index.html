@@ -103,8 +103,10 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 <section id="s-out" class="screen">
   <h2>Outbox on this phone</h2>
   <p>Pending: <b id="pendCount">0</b> &nbsp;&nbsp; Sent: <b id="sentCount">0</b></p>
-  <button class="btn orange" onclick="sendPending()">SEND ALL PENDING (one file)</button>
-  <p class="small">Each send creates one Excel-compatible (CSV) file. Share it by WhatsApp, email or Google Drive. Duplicates are skipped by head office, so sending twice is safe.</p>
+  <p class="small" id="upStatus"></p>
+  <p class="small">Jobs upload to the office automatically when the app is open and the phone has signal. Nothing needs to be pressed.</p>
+  <button class="btn orange" onclick="sendPending()">SEND ALL PENDING (manual backup)</button>
+  <p class="small">Use this only if automatic upload is not working. It creates one file to share by WhatsApp, email or Google Drive.</p>
   <div id="outList"></div>
 </section>
 
@@ -122,6 +124,7 @@ nav button.on{color:#1F3864;font-weight:bold;border-top:3px solid #1F3864}
 <section id="s-set" class="screen">
   <h2>This phone</h2>
   <p id="setInfo"></p>
+  <p class="small" id="setUp"></p>
   <button class="btn navy" onclick="lockNow()">LOCK NOW</button>
   <h2>Clean-up</h2>
   <p class="small">Removes SENT jobs from this phone only. Pending jobs and the job counter are kept.</p>
@@ -146,6 +149,9 @@ const CATS=["Rear view mirror replacement","Chain adjustment","Chain replacement
 const FIELDS=["fDate","fBike","fWarranty","fPlate","fCode","fMileage","fQty","fRemarks","jCat","jTech"];
 const HEAD=["Job ID","Line ID","Device ID","Submitted On","Repair Station","Transaction Date","Bike Model","Warranty","Number Plate","Mileage (km)","Technician","Repair Category","Job Description","Labour Done","Start Time","Finish Time","Job Status","Job Notes","Product Code","Spare Part Name","Unit Price (UGX)","Quantity","Amount (UGX)","Line Remarks"];
 const KEY_SET="mocoo_settings",KEY_JOBS="mocoo_jobs",KEY_DRAFT="mocoo_draft";
+const COLLECTOR_URL="PASTE-COLLECTOR-URL-HERE";
+const SECRET_KEY="JP-collector-2026-k7Q9x";
+const COLLECTOR_READY=!COLLECTOR_URL.includes("PASTE");
 const $=id=>document.getElementById(id);
 const pad=(n,w=2)=>String(n).padStart(w,"0");
 const fmt=n=>Number(n||0).toLocaleString("en-US");
@@ -155,7 +161,7 @@ const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}c
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const stationCode=n=>(STATIONS.find(s=>s[0]===n)||["","XXX"])[1];
 const PRICES=new Map();
-let settings=null,jobs=[],lines=[],hiddenAt=0,toastTimer;
+let settings=null,jobs=[],lines=[],hiddenAt=0,toastTimer,uploading=false;
 function todayStr(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function stampNow(){const d=new Date();return todayStr()+" "+pad(d.getHours())+":"+pad(d.getMinutes())}
 function stampFile(){const d=new Date();return todayStr().replace(/-/g,"")+"_"+pad(d.getHours())+pad(d.getMinutes())}
@@ -271,7 +277,7 @@ function resetAfterSubmit(){
   updateLookup();renderLines();draftSave();
 }
 
-/* ---------- SUBMIT, FILE AND SHARE ---------- */
+/* ---------- SUBMIT ---------- */
 function nextJobId(st){
   settings.seq=(settings.seq||0)+1;
   save(KEY_SET,settings);
@@ -294,17 +300,59 @@ function submitJob(){
   jobs.push(job);
   save(KEY_JOBS,jobs);
   resetAfterSubmit();
-  toast("Job "+jobId+" saved on this phone. Send it from Outbox when there is signal.",true);
+  toast("Job "+jobId+" saved on this phone. It will upload automatically when there is signal.",true);
+  uploadPending();
+}
+
+/* ---------- FILES AND AUTOMATIC UPLOAD ---------- */
+function jobRows(jb){
+  const dev=pad(settings.device),h=jb.h,j=jb.j;
+  const base=lineId=>[jb.jobId,lineId,dev,jb.submitted,h.station,h.date,h.bike,h.warranty,h.plate,h.mileage,j.tech,j.cat,j.desc,j.labour,j.start,j.finish,j.status,j.notes];
+  if(!jb.lines.length)return [base(jb.jobId+"-L00").concat(["","","","","",""])];
+  return jb.lines.map(l=>base(l.id).concat([l.code,l.name,l.price,l.qty,l.amount,l.remarks||""]));
 }
 function csvText(list){
-  const dev=pad(settings.device),rows=[HEAD];
-  list.forEach(jb=>{
-    const h=jb.h,j=jb.j;
-    const base=lineId=>[jb.jobId,lineId,dev,jb.submitted,h.station,h.date,h.bike,h.warranty,h.plate,h.mileage,j.tech,j.cat,j.desc,j.labour,j.start,j.finish,j.status,j.notes];
-    if(!jb.lines.length)rows.push(base(jb.jobId+"-L00").concat(["","","","","",""]));
-    jb.lines.forEach(l=>rows.push(base(l.id).concat([l.code,l.name,l.price,l.qty,l.amount,l.remarks||""])));
-  });
-  return "\uFEFF"+rows.map(r=>r.map(esc).join(",")).join("\r\n");
+  return "\uFEFF"+[HEAD,...list.flatMap(jobRows)].map(r=>r.map(esc).join(",")).join("\r\n");
+}
+function setUpStatus(t){
+  const a=$("upStatus"),b=$("setUp");
+  if(a)a.textContent=t;
+  if(b)b.textContent=t;
+}
+async function uploadPending(){
+  if(!settings||uploading)return;
+  if(!COLLECTOR_READY){setUpStatus("Automatic upload is not set up yet. Use SEND ALL PENDING.");return}
+  const pend=jobs.filter(j=>j.status==="PENDING");
+  if(!pend.length){setUpStatus("All jobs are uploaded. Checked "+stampNow()+".");return}
+  if(!navigator.onLine){setUpStatus("No signal. "+pend.length+" job(s) waiting to upload.");return}
+  uploading=true;
+  const batch=pend.slice(0,20);
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),30000);
+  try{
+    const res=await fetch(COLLECTOR_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({key:SECRET_KEY,rows:batch.flatMap(jobRows)}),signal:ctrl.signal});
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error||"the office server refused the upload");
+    const ids=batch.map(j=>j.jobId).filter(id=>data.jobs.includes(id));
+    markSent(ids);
+    const left=jobs.filter(j=>j.status==="PENDING").length;
+    setUpStatus(left?"Uploaded "+ids.length+" job(s). "+left+" still waiting.":"Uploaded "+ids.length+" job(s) at "+stampNow()+".");
+    if(left&&ids.length)setTimeout(()=>uploadPending(),1000);
+  }catch(err){
+    const why=err.name==="AbortError"?"timed out":(err.message||"no connection");
+    setUpStatus("Upload not completed ("+why+"). Jobs stay PENDING and will retry automatically.");
+  }finally{
+    clearTimeout(timer);
+    uploading=false;
+  }
+}
+function afterShare(res,ids){
+  if(res==="cancelled"){toast("Not sent. The job stays PENDING in Outbox.",false);return}
+  if(res==="downloaded"){toast("File downloaded. Share it from Files / Downloads, then mark it as sent in Outbox.",true);return}
+  if(confirm("Was the file sent to the office?\n\nOK = mark as SENT\nCancel = keep as PENDING")){
+    markSent(ids);toast("Marked as SENT.",true);
+  }else{
+    toast("Kept as PENDING. Send it again from Outbox.",false);
+  }
 }
 async function shareCsv(text,name){
   const file=new File([text],name,{type:"text/csv"});
@@ -320,15 +368,6 @@ async function shareCsv(text,name){
   a.href=URL.createObjectURL(file);a.download=name;
   document.body.appendChild(a);a.click();a.remove();
   return "downloaded";
-}
-function afterShare(res,ids){
-  if(res==="cancelled"){toast("Not sent. The job stays PENDING in Outbox.",false);return}
-  if(res==="downloaded"){toast("File downloaded. Share it from Files / Downloads, then mark it as sent in Outbox.",true);return}
-  if(confirm("Was the file sent to the office?\n\nOK = mark as SENT\nCancel = keep as PENDING")){
-    markSent(ids);toast("Marked as SENT.",true);
-  }else{
-    toast("Kept as PENDING. Send it again from Outbox.",false);
-  }
 }
 function markSent(ids){
   jobs.forEach(j=>{if(ids.includes(j.jobId))j.status="SENT"});
@@ -382,9 +421,11 @@ function go(id,btn){
   $(id).classList.add("on");btn.classList.add("on");
   if(id==="s-out")renderOutbox();
   if(id==="s-prices")renderPrices();
-  if(id==="s-set")renderSettings();
+  if(id==="s-set"){renderSettings();setUpStatus(upNoteText())}
   window.scrollTo(0,0);
 }
+let lastUpNote="";
+function upNoteText(){return lastUpNote}
 
 /* ---------- BOOT ---------- */
 function boot(){
@@ -403,14 +444,18 @@ function boot(){
   initForm();draftLoad();renderLines();updateLookup();renderOutbox();renderSettings();
   if(!loadPrices())toast("Price list not loaded. Connect to the internet once, then reopen the app.",false);
   lockNow();
+  uploadPending();
 }
 document.addEventListener("input",draftSave);
 document.addEventListener("change",draftSave);
 $("fCode").addEventListener("input",updateLookup);
 document.addEventListener("visibilitychange",()=>{
-  if(document.hidden)hiddenAt=Date.now();
-  else if(settings&&Date.now()-hiddenAt>120000)lockNow();
+  if(document.hidden){hiddenAt=Date.now();return}
+  if(settings&&Date.now()-hiddenAt>120000)lockNow();
+  if(settings)uploadPending();
 });
+window.addEventListener("online",()=>uploadPending());
+setInterval(()=>{if(!document.hidden)uploadPending()},5*60*1000);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 boot();
 </script>
